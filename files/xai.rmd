@@ -2,29 +2,252 @@
 title: "Untitled"
 output: github_document
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r}
+library(reshape2)
+library(fairness)
+library(plotly)
+library(dplyr)
+library(pROC)
+library(partykit)
+library(pre)
+library(ggplot2)
+library(pdp)
+library(randomForest)
 ```
 
-## GitHub Documents
 
-This is an R Markdown format used for publishing markdown documents to GitHub. When you click the **Knit** button all R code chunks are run and a markdown file (.md) suitable for publishing to GitHub is generated.
 
-## Including Code
+```{r}
+df <- read.csv("data/day.csv")
 
-You can include R code in the document as follows:
+#one hot encoding para la variable season
+# Supongamos que tu dataframe se llama df
+df$season <- as.factor(df$season)  # Asegúrate de que season sea factor
 
-```{r cars}
-summary(cars)
+# Crear las variables dummy
+# (elimina la primera columna para evitar multicolinealidad)
+season_dummies <- model.matrix(~ season, data = df)[, -1]
+
+# Añadir al dataframe original
+df <- cbind(df, season_dummies)
+
+#crear MISTY,
+df$MISTY <- ifelse(df$weathersit == 2, 1, 0)
+#rain si es 3 o 4, entonces 1
+df$RAIN <- ifelse(df$weathersit == 3 | df$weathersit == 4, 1, 0)
+
+
+df$hum <- df$hum * 100
+df$windspeed <- df$windspeed * 67
+df$temp <- df$temp * 47 - 8
+
+
+days_since_2011 <- as.Date(df$dteday, format = "%Y-%m-%d") -
+  as.Date("2011-01-01")
+df$days_since_2011 <- as.numeric(days_since_2011)
+df
 ```
 
-## Including Plots
+```{r}
+train_df <- df %>% select(c("cnt", "temp", "hum", "windspeed", "days_since_2011", "MISTY", "RAIN", "season2", "season3", "season4","workingday", "holiday"))
 
-You can also embed plots, for example:
+rf_model <- randomForest(
+  cnt ~ .,
+  data = train_df,
+  ntree = 100,
+  importance = TRUE
+)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+
+summary(rf_model)
+importance(rf_model)
+```	
+
+
+
+```{r}
+pdp_temp <- partial(rf_model, pred.var = "temp", train = train_df)
+
+ggplot(pdp_temp, aes(x = temp, y = yhat)) +
+  geom_line(size = 1, color = "black") +
+  geom_rug(data = train_df, aes(x = temp), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+  labs(
+    x = "Temperature",
+    y = "Predicted number of bike rentals"
+  ) +
+  theme_minimal()
+
+pdp_hum <- partial(rf_model, pred.var = "hum", train = train_df)
+
+ggplot(pdp_hum, aes(x = hum, y = yhat)) +
+  geom_line(size = 1, color = "black") +
+  geom_rug(data = train_df, aes(x = hum), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+  labs(
+    x = "Humidity",
+    y = "Predicted number of bike rentals"
+  ) +
+  theme_minimal()
+
+pdp_wind <- partial(rf_model, pred.var = "windspeed", train = train_df)
+
+ggplot(pdp_wind, aes(x = windspeed, y = yhat)) +
+  geom_line(size = 1, color = "black") +
+  geom_rug(data = train_df, aes(x = windspeed), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+  labs(
+    x = "Wind speed",
+    y = "Predicted number of bike rentals"
+  ) +
+  theme_minimal()
+
+
+pdp_sy2011 <- partial(rf_model, pred.var = "days_since_2011", train = train_df)
+
+ggplot(pdp_sy2011, aes(x = days_since_2011, y = yhat)) +
+  geom_line(size = 1, color = "black") +
+  geom_rug(data = train_df, aes(x = days_since_2011), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+  labs(
+    x = "Days Since 2011",
+    y = "Predicted number of bike rentals"
+  ) +
+  theme_minimal()
+
+
+  
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+## Ejercicio 2
+
+
+```{r}
+set.seed(123)
+n_muestra <- 100
+filas <- sample(nrow(df), n_muestra)
+df_sub <- df[filas, ]
+
+rf_model_2 <- randomForest(
+  cnt ~ .,
+  data = df_sub,
+  ntree = 100,
+  importance = TRUE
+)
+
+rf.part <- partial(rf_model_2,
+                   pred.var = c("hum","temp"),
+                   plot     = FALSE)
+```
+
+
+
+
+```{r}
+ggplot(rf.part, aes(x = hum, y = temp, fill = yhat)) +
+  geom_raster() +
+  scale_fill_viridis_c(option = "D") +
+  geom_rug(data = df_sub, aes(x = hum), sides = "b", alpha = 0.5, inherit.aes = FALSE) +  # abajo
+  geom_rug(data = df_sub, aes(y = temp), sides = "l", alpha = 0.5, inherit.aes = FALSE) +    # izquierda
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Humidity",
+       y = "Temperature",
+       fill = "Predicted Count")
+```
+
+
+```{r}
+df_house <- read.csv("data/kc_house_data.csv")
+
+df_train <- df_house %>% select(c("price", "bedrooms", "bathrooms", "sqft_living", "sqft_lot", "floors", "yr_built"))
+
+summary(df_house)
+```
+
+
+
+
+
+
+
+```{r}
+rf_model_house <- randomForest(
+  price ~ .,
+  data = df_train,
+  ntree = 100,
+  importance = TRUE
+)
+
+summary(rf_model_house)
+```
+
+```{r}
+
+pdp_bedrooms <- partial(rf_model_house, pred.var = "bedrooms", train = df_train)
+
+ggplot(pdp_bedrooms, aes(x = bedrooms, y = yhat)) +
+  geom_line(size = 1, color = "black") +
+  geom_rug(data = df_train, aes(x = bedrooms), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+  labs(
+    x = "Bedrooms",
+    y = "Predicted House Price"
+  ) +
+  theme_minimal()
+
+pdp_bathrooms <- partial(rf_model_house, pred.var = "bathrooms", train = df_train)
+
+ggplot(pdp_bathrooms, aes(x = bathrooms, y = yhat)) +
+  geom_line(size = 1, color = "black") +
+  geom_rug(data = df_train, aes(x = bathrooms), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+  labs(
+    x = "Bathrooms",
+    y = "Predicted House Price"
+  ) +
+  theme_minimal()
+
+pdp_sqft_living <- partial(rf_model_house, pred.var = "sqft_living", train = df_train)
+
+ggplot(pdp_sqft_living, aes(x = sqft_living, y = yhat)) +
+  geom_line(size = 1, color = "black") +
+  geom_rug(data = df_train, aes(x = sqft_living), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+  labs(
+    x = "Square Footage of Living Space",
+    y = "Predicted House Price"
+  ) +
+  theme_minimal()
+
+pdp_sqft_lot <- partial(rf_model_house, pred.var = "sqft_lot", train = df_train)
+
+ggplot(pdp_sqft_lot, aes(x = sqft_lot, y = yhat)) +
+  geom_line(size = 1, color = "black") +
+  geom_rug(data = df_train, aes(x = sqft_lot), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+  labs(
+    x = "Square Footage of Lot",
+    y = "Predicted House Price"
+  ) +
+  theme_minimal()
+
+pdp_floors <- partial(rf_model_house, pred.var = "floors", train = df_train)
+
+
+ggplot(pdp_floors, aes(x = floors, y = yhat)) +
+  geom_line(size = 1, color = "black") +
+  geom_rug(data = df_train, aes(x = floors), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+  labs(
+    x = "Number of Floors",
+    y = "Predicted House Price"
+  ) +
+  theme_minimal()
+
+pdp_yr_built <- partial(rf_model_house, pred.var = "yr_built", train = df_train)
+
+ggplot(pdp_yr_built, aes(x = yr_built, y = yhat)) +
+  geom_line(size = 1, color = "black") +
+  geom_rug(data = df_train, aes(x = yr_built), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+  labs(
+    x = "Year Built",
+    y = "Predicted House Price"
+  ) +
+  theme_minimal()
+
+```
