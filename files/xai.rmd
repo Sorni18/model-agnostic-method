@@ -18,7 +18,7 @@ library(randomForest)
 
 
 ```{r}
-df <- read.csv("data/day.csv")
+df <- read.csv("../data/day.csv")
 
 #one hot encoding para la variable season
 # Supongamos que tu dataframe se llama df
@@ -72,6 +72,7 @@ ggplot(pdp_temp, aes(x = temp, y = yhat)) +
   geom_line(size = 1, color = "black") +
   geom_rug(data = train_df, aes(x = temp), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
   labs(
+    title = "Partial Dependence Plot for Temperature",
     x = "Temperature",
     y = "Predicted number of bike rentals"
   ) +
@@ -83,6 +84,7 @@ ggplot(pdp_hum, aes(x = hum, y = yhat)) +
   geom_line(size = 1, color = "black") +
   geom_rug(data = train_df, aes(x = hum), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
   labs(
+    title = "Partial Dependence Plot for Humidity",
     x = "Humidity",
     y = "Predicted number of bike rentals"
   ) +
@@ -94,6 +96,7 @@ ggplot(pdp_wind, aes(x = windspeed, y = yhat)) +
   geom_line(size = 1, color = "black") +
   geom_rug(data = train_df, aes(x = windspeed), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
   labs(
+    title = "Partial Dependence Plot for Wind Speed",
     x = "Wind speed",
     y = "Predicted number of bike rentals"
   ) +
@@ -106,35 +109,18 @@ ggplot(pdp_sy2011, aes(x = days_since_2011, y = yhat)) +
   geom_line(size = 1, color = "black") +
   geom_rug(data = train_df, aes(x = days_since_2011), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
   labs(
+    title = "Partial Dependence Plot for Days Since 2011",
     x = "Days Since 2011",
     y = "Predicted number of bike rentals"
   ) +
   theme_minimal()
-
-
-  
-
 ```
 
 
 
 ## Ejercicio 2
-
-
 ```{r}
-set.seed(123)
-n_muestra <- 100
-filas <- sample(nrow(df), n_muestra)
-df_sub <- df[filas, ]
-
-rf_model_2 <- randomForest(
-  cnt ~ .,
-  data = df_sub,
-  ntree = 100,
-  importance = TRUE
-)
-
-rf.part <- partial(rf_model_2,
+rf.part <- partial(rf_model,
                    pred.var = c("hum","temp"),
                    plot     = FALSE)
 ```
@@ -145,26 +131,28 @@ rf.part <- partial(rf_model_2,
 ```{r}
 ggplot(rf.part, aes(x = hum, y = temp, fill = yhat)) +
   geom_raster() +
-  scale_fill_viridis_c(option = "D") +
-  geom_rug(data = df_sub, aes(x = hum), sides = "b", alpha = 0.5, inherit.aes = FALSE) +  # abajo
-  geom_rug(data = df_sub, aes(y = temp), sides = "l", alpha = 0.5, inherit.aes = FALSE) +    # izquierda
+  scale_fill_distiller(palette = "Spectral", direction = -1) + 
+  geom_rug(data = df, aes(x = hum), sides = "b", alpha = 0.5, inherit.aes = FALSE) +
+  geom_rug(data = df, aes(y = temp), sides = "l", alpha = 0.5, inherit.aes = FALSE) +
   theme_minimal() +
-  labs(title = "Partial Dependence Plot",
-       x = "Humidity",
-       y = "Temperature",
-       fill = "Predicted Count")
+  labs(
+    title = "Partial Dependence Plot for Humidity and Temperature",
+    x     = "Humidity",
+    y     = "Temperature",
+    fill  = "Predicted Count"
+  )
 ```
 
 
+
+
 ```{r}
-df_house <- read.csv("data/kc_house_data.csv")
+df_house <- read.csv("../data/kc_house_data.csv")
 
 df_train <- df_house %>% select(c("price", "bedrooms", "bathrooms", "sqft_living", "sqft_lot", "floors", "yr_built"))
 
 summary(df_house)
 ```
-
-
 
 
 
@@ -182,6 +170,19 @@ summary(rf_model_house)
 ```
 
 ```{r}
+# calcular el error medio absoluto
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+
+mae(df_train$price, rf_model_house$predicted)
+```
+```{r}
+mean(df_train$price)
+```
+
+
+```{r}
 
 pdp_bedrooms <- partial(rf_model_house, pred.var = "bedrooms", train = df_train)
 
@@ -189,6 +190,7 @@ ggplot(pdp_bedrooms, aes(x = bedrooms, y = yhat)) +
   geom_line(size = 1, color = "black") +
   geom_rug(data = df_train, aes(x = bedrooms), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
   labs(
+    title = "Partial Dependence Plot for Bedrooms",
     x = "Bedrooms",
     y = "Predicted House Price"
   ) +
@@ -200,6 +202,7 @@ ggplot(pdp_bathrooms, aes(x = bathrooms, y = yhat)) +
   geom_line(size = 1, color = "black") +
   geom_rug(data = df_train, aes(x = bathrooms), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
   labs(
+    title = "Partial Dependence Plot for Bathrooms",
     x = "Bathrooms",
     y = "Predicted House Price"
   ) +
@@ -211,21 +214,22 @@ ggplot(pdp_sqft_living, aes(x = sqft_living, y = yhat)) +
   geom_line(size = 1, color = "black") +
   geom_rug(data = df_train, aes(x = sqft_living), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
   labs(
+    title = "Partial Dependence Plot for Square Footage of Living Space",
     x = "Square Footage of Living Space",
     y = "Predicted House Price"
   ) +
   theme_minimal()
 
-pdp_sqft_lot <- partial(rf_model_house, pred.var = "sqft_lot", train = df_train)
-
-ggplot(pdp_sqft_lot, aes(x = sqft_lot, y = yhat)) +
-  geom_line(size = 1, color = "black") +
-  geom_rug(data = df_train, aes(x = sqft_lot), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
-  labs(
-    x = "Square Footage of Lot",
-    y = "Predicted House Price"
-  ) +
-  theme_minimal()
+#pdp_sqft_lot <- partial(rf_model_house, pred.var = "sqft_lot", train = df_train)
+#
+#ggplot(pdp_sqft_lot, aes(x = sqft_lot, y = yhat)) +
+#  geom_line(size = 1, color = "black") +
+#  geom_rug(data = df_train, aes(x = sqft_lot), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+#  labs(
+#    x = "Square Footage of Lot",
+#    y = "Predicted House Price"
+#  ) +
+#  theme_minimal()
 
 pdp_floors <- partial(rf_model_house, pred.var = "floors", train = df_train)
 
@@ -234,20 +238,21 @@ ggplot(pdp_floors, aes(x = floors, y = yhat)) +
   geom_line(size = 1, color = "black") +
   geom_rug(data = df_train, aes(x = floors), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
   labs(
+    title = "Partial Dependence Plot for Number of Floors",
     x = "Number of Floors",
     y = "Predicted House Price"
   ) +
   theme_minimal()
 
-pdp_yr_built <- partial(rf_model_house, pred.var = "yr_built", train = df_train)
-
-ggplot(pdp_yr_built, aes(x = yr_built, y = yhat)) +
-  geom_line(size = 1, color = "black") +
-  geom_rug(data = df_train, aes(x = yr_built), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
-  labs(
-    x = "Year Built",
-    y = "Predicted House Price"
-  ) +
-  theme_minimal()
+#pdp_yr_built <- partial(rf_model_house, pred.var = "yr_built", train = df_train)
+#
+#ggplot(pdp_yr_built, aes(x = yr_built, y = yhat)) +
+#  geom_line(size = 1, color = "black") +
+#  geom_rug(data = df_train, aes(x = yr_built), sides = "b", alpha = 0.2, inherit.aes = FALSE) +
+#  labs(
+#    x = "Year Built",
+#    y = "Predicted House Price"
+#  ) +
+#  theme_minimal()
 
 ```
