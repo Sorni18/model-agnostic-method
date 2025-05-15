@@ -20,20 +20,15 @@ library(randomForest)
 ```{r}
 df <- read.csv("../data/day.csv")
 
-#one hot encoding para la variable season
-# Supongamos que tu dataframe se llama df
-df$season <- as.factor(df$season)  # Asegúrate de que season sea factor
+df$season <- as.factor(df$season)
 
-# Crear las variables dummy
-# (elimina la primera columna para evitar multicolinealidad)
 season_dummies <- model.matrix(~ season, data = df)[, -1]
 
-# Añadir al dataframe original
 df <- cbind(df, season_dummies)
 
-#crear MISTY,
+
 df$MISTY <- ifelse(df$weathersit == 2, 1, 0)
-#rain si es 3 o 4, entonces 1
+
 df$RAIN <- ifelse(df$weathersit == 3 | df$weathersit == 4, 1, 0)
 
 
@@ -120,6 +115,7 @@ ggplot(pdp_sy2011, aes(x = days_since_2011, y = yhat)) +
 
 ## Ejercicio 2
 ```{r}
+# Hemos decidido no hacer submuestreo porque se ejecutaba rápido y así no se perdía información
 rf.part <- partial(rf_model,
                    pred.var = c("hum","temp"),
                    plot     = FALSE)
@@ -256,3 +252,39 @@ ggplot(pdp_floors, aes(x = floors, y = yhat)) +
 #  theme_minimal()
 
 ```
+
+
+
+
+
+
+
+```{r}
+ggplot(df_train, aes(x = factor(floors))) +
+  geom_bar(fill = "steelblue") +
+  labs(
+    title = "Count of Houses by Number of Floors",
+    x = "Number of Floors",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+ggplot(df_train, aes(x = factor(bedrooms))) +
+  geom_bar(fill = "steelblue") +
+  labs(
+    title = "Count of Houses by Number of Bedrooms",
+    x = "Number of Bedrooms",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+ggplot(df_train, aes(x = factor(bathrooms))) +
+  geom_bar(fill = "steelblue") +
+  labs(
+    title = "Count of Houses by Number of Bathrooms",
+    x = "Number of Bathrooms",
+    y = "Count"
+  ) +
+  theme_minimal()
+```
+
